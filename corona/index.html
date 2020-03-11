@@ -1,0 +1,136 @@
+<html>
+  <head>
+    <script
+      src="https://code.jquery.com/jquery-3.4.1.min.js"
+      integrity="sha256-CSXorXvZcTkaix6Yvo6HppcZGetbYMGWSFlBw8HfCJo="
+      crossorigin="anonymous"
+    ></script>
+    <script
+      src="https://cdnjs.cloudflare.com/ajax/libs/moment.js/2.24.0/moment.min.js"
+      integrity="sha256-4iQZ6BVL4qNKlQ27TExEhBN1HFPvAvAMbFavKKosSWQ="
+      crossorigin="anonymous"
+    ></script>
+    <script
+      src="https://cdn.jsdelivr.net/npm/chart.js@2.9.3/dist/Chart.min.js"
+      integrity="sha256-R4pqcOYV8lt7snxMQO/HSbVCFRPMdrhAFMH+vr9giYI="
+      crossorigin="anonymous"
+    ></script>
+  </head>
+  <body>
+    <canvas id="cChart" width="100%"></canvas>
+    <script>
+      $.get(
+        'https://w3qa5ydb4l.execute-api.eu-west-1.amazonaws.com/prod/finnishCoronaData',
+        data => {
+          let cData = Array.from(
+            data.confirmed
+              .slice(1)
+              .reduce(
+                (cMap, confirmed, i) =>
+                  cMap.set(
+                    new Date(confirmed.date).setHours(0, 0, 0, 0),
+                    i + 1
+                  ),
+                new Map()
+              ),
+            ([date, confirmed]) => ({ t: new Date(date), y: confirmed })
+          ).sort((a, b) => a.t - b.t)
+          let tData = cData.map(value => ({
+            x: moment(value.t).diff(cData[0].t, 'days'),
+            y: Math.log10(value.y),
+          }))
+          let tSlope =
+            (tData.length *
+              tData.reduce((sum, data) => sum + data.x * data.y, 0) -
+              tData.reduce((sum, data) => sum + data.x, 0) *
+                tData.reduce((sum, data) => sum + data.y, 0)) /
+            (tData.length *
+              tData.reduce((sum, data) => sum + data.x * data.x, 0) -
+              Math.pow(
+                tData.reduce((sum, data) => sum + data.x, 0),
+                2
+              ))
+          let tOffset =
+            (tData.reduce((sum, data) => sum + data.y, 0) -
+              tSlope * tData.reduce((sum, data) => sum + data.x, 0)) /
+            tData.length
+          tData = Array.from(
+            {
+              length: moment()
+                .add(1, 'months')
+                .diff(cData[0].t, 'days'),
+            },
+            (n, i) => ({
+              x: moment(cData[0].t).add(i, 'days'),
+              y: Math.pow(10, i * tSlope + tOffset),
+            })
+          )
+          let cChart = new Chart('cChart', {
+            type: 'line',
+            data: {
+              datasets: [
+                {
+                  data: cData,
+                  fill: false,
+                  borderColor: 'rgb(230, 90, 20)',
+                  pointRadius: 0,
+                },
+                {
+                  data: tData,
+                  fill: false,
+                  borderColor: 'rgb(240,180,40)',
+                  borderDash: [10, 5],
+                  pointRadius: 0,
+                },
+              ],
+            },
+            options: {
+              title: {
+                display: false,
+              },
+              legend: {
+                display: false,
+              },
+              scales: {
+                xAxes: [
+                  {
+                    type: 'time',
+                    time: {
+                      tick: 'day',
+                    },
+                    ticks: {
+                      min: cData[0].t,
+                      max: moment().add(1, 'months'),
+                    },
+                  },
+                ],
+                yAxes: [
+                  {
+                    type: 'logarithmic',
+                    ticks: {
+                      autoSkip: false,
+                      callback: tick => {
+                        if (
+                          tick /
+                            Math.pow(
+                              10,
+                              Math.floor(Chart.helpers.log10(tick))
+                            ) ===
+                          1
+                        )
+                          return tick.toString()
+                        return ''
+                      },
+                      min: 1,
+                      max: 100000,
+                    },
+                  },
+                ],
+              },
+            },
+          })
+        }
+      )
+    </script>
+  </body>
+</html>
