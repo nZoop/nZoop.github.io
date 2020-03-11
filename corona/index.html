@@ -17,12 +17,202 @@
     ></script>
   </head>
   <body>
-    <canvas id="cChart" width="100%"></canvas>
+    <div width="95%">
+      <canvas id="cChart"></canvas>
+    </div>
     <script>
+      const infectionLineDataset = {
+        data: [{ t: moment(), y: 0 }],
+        legend: {
+          text: 'confirmed infections',
+          fillStyle: 'rgba(230, 90, 20, 0.5)',
+          strokeStyle: 'rgb(230, 90, 20)',
+          lineJoin: 'round',
+        },
+        type: 'line',
+        fill: false,
+        borderColor: 'rgb(230, 90, 20)',
+        pointRadius: 0,
+        xAxisID: 'time-axis',
+        yAxisID: 'log-axis',
+      }
+      const infectionBarDataset = {
+        data: [{ t: moment(), y: 0 }],
+        type: 'bar',
+        order: '1',
+        backgroundColor: 'rgba(230, 90, 20, 0.5)',
+        xAxisID: 'time-axis',
+        yAxisID: 'linear-axis',
+      }
+      const trendlineDataset = {
+        data: [{ t: moment(), y: 0 }],
+        legend: {
+          text: 'projected infections',
+          fillStyle: 'rgba(240, 180, 40, 0.4)',
+          strokeStyle: 'rgb(240, 180, 40)',
+          lineDash: [8, 4],
+          lineJoin: 'round',
+        },
+        type: 'line',
+        fill: false,
+        borderColor: 'rgb(240, 180, 40)',
+        borderDash: [10, 5],
+        pointRadius: 0,
+        xAxisID: 'time-axis',
+        yAxisID: 'log-axis',
+      }
+      const trendbarDataset = {
+        data: [{ t: moment(), y: 0 }],
+        type: 'bar',
+        order: '2',
+        backgroundColor: 'rgba(240, 180, 40, 0.4)',
+        xAxisID: 'time-axis',
+        yAxisID: 'linear-axis',
+      }
+
+      const predictionLineDataset = week => ({
+        data: [{ t: moment(), y: 0 }],
+        legend: {
+          text: `epidemic contained within ${week} weeks from first infection`,
+          fillStyle: `rgba(${140 + week * 15}, ${100 + week * 20}, ${160 +
+            week * 10}, 0.6)`,
+          strokeStyle: `rgb(${140 + week * 15}, ${100 + week * 20}, ${160 +
+            week * 10})`,
+          lineDash: [8, 4],
+          lineJoin: 'round',
+        },
+        type: 'line',
+        order: week,
+        fill: false,
+        borderColor: `rgb(${140 + week * 15}, ${100 + week * 20}, ${160 +
+          week * 10})`,
+        borderDash: [10, 5],
+        pointRadius: 0,
+        xAxisID: 'time-axis',
+        yAxisID: 'log-axis',
+        cutoffWeek: week,
+      })
+      const predictionLineDatasets = [
+        predictionLineDataset(3),
+        predictionLineDataset(4),
+        predictionLineDataset(5),
+        predictionLineDataset(6),
+      ]
+      const predictionBarDataset = week => ({
+        data: [{ t: moment(), y: 0 }],
+        type: 'bar',
+        order: week,
+        backgroundColor: `rgba(${140 + week * 15}, ${100 + week * 20}, ${160 +
+          week * 10}, 0.6)`,
+        xAxisID: 'time-axis',
+        yAxisID: 'log-axis',
+        cutoffWeek: week,
+      })
+      const predictionBarDatasets = [
+        predictionBarDataset(3),
+        predictionBarDataset(4),
+        predictionBarDataset(5),
+        predictionBarDataset(6),
+      ]
+
+      const cChart = new Chart('cChart', {
+        type: 'bar',
+        data: {
+          datasets: [
+            infectionLineDataset,
+            infectionBarDataset,
+            trendlineDataset,
+            trendbarDataset,
+            predictionLineDatasets[0],
+            predictionLineDatasets[1],
+            predictionLineDatasets[2],
+            predictionLineDatasets[3],
+            predictionBarDatasets[0],
+            predictionBarDatasets[1],
+            predictionBarDatasets[2],
+            predictionBarDatasets[3],
+          ],
+        },
+        options: {
+          title: {
+            text: 'Spread of COVID-19 in Finland',
+            display: true,
+          },
+          legend: {
+            position: 'right',
+            labels: {
+              generateLabels: ({ config }) =>
+                config.data.datasets
+                  .filter(dataset => 'legend' in dataset)
+                  .map(dataset => dataset.legend),
+            },
+          },
+          scales: {
+            xAxes: [
+              {
+                id: 'time-axis',
+                type: 'time',
+                time: {
+                  tick: 'day',
+                },
+                ticks: {
+                  min: moment(),
+                  max: moment().add(1, 'months'),
+                },
+              },
+            ],
+            yAxes: [
+              {
+                id: 'log-axis',
+                scaleLabel: {
+                  labelString: 'Total number of infected [line]',
+                  display: true,
+                },
+                type: 'logarithmic',
+                position: 'left',
+                ticks: {
+                  autoSkip: false,
+                  callback: tick => {
+                    if (
+                      tick /
+                        Math.pow(10, Math.floor(Chart.helpers.log10(tick))) ===
+                      1
+                    )
+                      return tick.toString()
+                    return ''
+                  },
+                  min: 1,
+                  max: 100000,
+                },
+              },
+              {
+                id: 'linear-axis',
+                scaleLabel: {
+                  labelString: 'New infections per day [bars]',
+                  display: true,
+                },
+                type: 'linear',
+                position: 'right',
+                ticks: {
+                  min: 0,
+                  max: 250,
+                  stepSize: 50,
+                },
+              },
+            ],
+          },
+        },
+      })
+
       $.get(
         'https://w3qa5ydb4l.execute-api.eu-west-1.amazonaws.com/prod/finnishCoronaData',
         data => {
-          let cData = Array.from(
+          const makeBars = line =>
+            line.map((value, i) => ({
+              t: moment(value.t),
+              y: i === 0 ? value.y : value.y - line[i - 1].y,
+            }))
+          let iLine = Array.from(
             data.confirmed
               .slice(1)
               .reduce(
@@ -33,10 +223,11 @@
                   ),
                 new Map()
               ),
-            ([date, confirmed]) => ({ t: new Date(date), y: confirmed })
+            ([date, confirmed]) => ({ t: moment(date), y: confirmed })
           ).sort((a, b) => a.t - b.t)
-          let tData = cData.map(value => ({
-            x: moment(value.t).diff(cData[0].t, 'days'),
+          let iBars = makeBars(iLine)
+          let tData = iLine.map(value => ({
+            x: value.t.diff(iLine[0].t, 'days'),
             y: Math.log10(value.y),
           }))
           let tSlope =
@@ -54,81 +245,70 @@
             (tData.reduce((sum, data) => sum + data.y, 0) -
               tSlope * tData.reduce((sum, data) => sum + data.x, 0)) /
             tData.length
-          tData = Array.from(
+          let tLine = Array.from(
             {
               length: moment()
                 .add(1, 'months')
-                .diff(cData[0].t, 'days'),
+                .diff(iLine[0].t, 'days'),
             },
             (n, i) => ({
-              x: moment(cData[0].t).add(i, 'days'),
-              y: Math.pow(10, i * tSlope + tOffset),
+              t: moment(iLine[0].t).add(i, 'days'),
+              y: Math.floor(Math.pow(10, i * tSlope + tOffset)),
             })
           )
-          let cChart = new Chart('cChart', {
-            type: 'line',
-            data: {
-              datasets: [
-                {
-                  data: cData,
-                  fill: false,
-                  borderColor: 'rgb(230, 90, 20)',
-                  pointRadius: 0,
-                },
-                {
-                  data: tData,
-                  fill: false,
-                  borderColor: 'rgb(240,180,40)',
-                  borderDash: [10, 5],
-                  pointRadius: 0,
-                },
-              ],
+          let tBars = makeBars(tLine)
+
+          infectionLineDataset.data = iLine
+          infectionBarDataset.data = iBars
+          trendlineDataset.data = tLine
+          trendbarDataset.data = tBars
+
+          const predictLine = week =>
+            tLine
+              .filter(i =>
+                i.t.isSameOrAfter(moment(iLine[0].t).add(week, 'weeks'))
+              )
+              .map((value, i) => ({
+                t: moment(value.t),
+                y: Math.floor(
+                  Math.pow(
+                    10,
+                    (7 * week +
+                      Math.log(
+                        value.t.diff(
+                          moment(iLine[0].t).add(week, 'weeks'),
+                          'days'
+                        ) + 1
+                      )) *
+                      tSlope +
+                      tOffset
+                  )
+                ),
+              }))
+          predictionLineDatasets.forEach(
+            dataset => (dataset.data = predictLine(dataset.cutoffWeek))
+          )
+          predictionBarDatasets.forEach(
+            (dataset, i) =>
+              (dataset.data = makeBars(predictionLineDatasets[i].data).splice(
+                1
+              ))
+          )
+
+          cChart.options.scales.xAxes[0] = {
+            id: 'time-axis',
+            type: 'time',
+            time: {
+              tick: 'day',
             },
-            options: {
-              title: {
-                display: false,
-              },
-              legend: {
-                display: false,
-              },
-              scales: {
-                xAxes: [
-                  {
-                    type: 'time',
-                    time: {
-                      tick: 'day',
-                    },
-                    ticks: {
-                      min: cData[0].t,
-                      max: moment().add(1, 'months'),
-                    },
-                  },
-                ],
-                yAxes: [
-                  {
-                    type: 'logarithmic',
-                    ticks: {
-                      autoSkip: false,
-                      callback: tick => {
-                        if (
-                          tick /
-                            Math.pow(
-                              10,
-                              Math.floor(Chart.helpers.log10(tick))
-                            ) ===
-                          1
-                        )
-                          return tick.toString()
-                        return ''
-                      },
-                      min: 1,
-                      max: 100000,
-                    },
-                  },
-                ],
-              },
+            ticks: {
+              min: moment(iLine[0].t),
+              max: moment()
+                .add(1, 'months')
+                .add(-1, 'days'),
             },
-          })
+          }
+          cChart.update()
         }
       )
     </script>
