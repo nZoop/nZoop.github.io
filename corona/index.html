@@ -105,7 +105,7 @@
         backgroundColor: `rgba(${140 + week * 15}, ${100 + week * 20}, ${160 +
           week * 10}, 0.6)`,
         xAxisID: 'time-axis',
-        yAxisID: 'log-axis',
+        yAxisID: 'linear-axis',
         cutoffWeek: week,
       })
       const predictionBarDatasets = [
@@ -173,16 +173,12 @@
                 ticks: {
                   autoSkip: false,
                   callback: tick => {
-                    if (
-                      tick /
-                        Math.pow(10, Math.floor(Chart.helpers.log10(tick))) ===
-                      1
-                    )
+                    if (tick / Math.pow(10, Math.floor(Math.log10(tick))) === 1)
                       return tick.toString()
                     return ''
                   },
                   min: 1,
-                  max: 100000,
+                  max: 6000000,
                 },
               },
               {
@@ -194,9 +190,14 @@
                 type: 'linear',
                 position: 'right',
                 ticks: {
+                  callback: tick => {
+                    if (tick % 50 === 0) return tick.toString()
+                    return ''
+                  },
+
                   min: 0,
-                  max: 250,
-                  stepSize: 50,
+                  max: 600 + Math.log10(6) * 100,
+                  stepSize: 100,
                 },
               },
             ],
@@ -248,7 +249,7 @@
           let tLine = Array.from(
             {
               length: moment()
-                .add(1, 'months')
+                .add(2, 'months')
                 .diff(iLine[0].t, 'days'),
             },
             (n, i) => ({
@@ -304,7 +305,7 @@
             ticks: {
               min: moment(iLine[0].t),
               max: moment()
-                .add(1, 'months')
+                .add(2, 'months')
                 .add(-1, 'days'),
             },
           }
