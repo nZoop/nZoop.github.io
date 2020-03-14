@@ -21,59 +21,87 @@
       <canvas id="cChart"></canvas>
     </div>
     <script>
+      console.log(navigator.language)
+      console.log(navigator.languages)
+      const labels = {
+        en: {
+          chart: 'Spread of COVID-19 in Finland',
+          bars: 'New infections per day [bars]',
+          line: 'Total number of infected [line]',
+          iLine: 'confirmed infections',
+          tLine: 'projected infections',
+          pLine: ['epidemic contained within', 'weeks from first infection'],
+        },
+        fi: {
+          chart: 'Koronaviruksen levinneisyys suomessa',
+          bars: 'Päivittäiset tartunnat [pylväät]',
+          line: 'Tartunnansaaneiden kokonaismäärä [viiva]',
+          iLine: 'varmistetut tartunnat',
+          tLine: 'ennustetut tartunnat',
+          pLine: [
+            'epidemia taittuu',
+            'viikon sisällä ensimmäisistä tartunnoista',
+          ],
+        },
+      }[navigator.language.slice(0, 2)]
+
       const infectionLineDataset = {
         data: [{ t: moment(), y: 0 }],
         legend: {
-          text: 'confirmed infections',
+          text: labels.iLine,
           fillStyle: 'rgba(230, 90, 20, 0.5)',
           strokeStyle: 'rgb(230, 90, 20)',
           lineJoin: 'round',
         },
+        order: 1,
         type: 'line',
         fill: false,
         borderColor: 'rgb(230, 90, 20)',
         pointRadius: 0,
-        xAxisID: 'time-axis',
+        xAxisID: 'time-axis-0',
         yAxisID: 'log-axis',
       }
       const infectionBarDataset = {
         data: [{ t: moment(), y: 0 }],
         type: 'bar',
-        order: '1',
+        order: 10,
         backgroundColor: 'rgba(230, 90, 20, 0.5)',
-        xAxisID: 'time-axis',
+        barPercentage: 0.4,
+        xAxisID: 'time-axis-0',
         yAxisID: 'linear-axis',
       }
       const trendlineDataset = {
         data: [{ t: moment(), y: 0 }],
         legend: {
-          text: 'projected infections',
+          text: labels.tLine,
           fillStyle: 'rgba(240, 180, 40, 0.4)',
           strokeStyle: 'rgb(240, 180, 40)',
           lineDash: [8, 4],
           lineJoin: 'round',
         },
         type: 'line',
+        order: 2,
         fill: false,
         borderColor: 'rgb(240, 180, 40)',
         borderDash: [10, 5],
         pointRadius: 0,
-        xAxisID: 'time-axis',
+        xAxisID: 'time-axis-0',
         yAxisID: 'log-axis',
       }
       const trendbarDataset = {
         data: [{ t: moment(), y: 0 }],
         type: 'bar',
-        order: '2',
+        order: 11,
         backgroundColor: 'rgba(240, 180, 40, 0.4)',
-        xAxisID: 'time-axis',
+        barPercentage: 0.6,
+        xAxisID: 'time-axis-0',
         yAxisID: 'linear-axis',
       }
 
       const predictionLineDataset = week => ({
         data: [{ t: moment(), y: 0 }],
         legend: {
-          text: `epidemic contained within ${week} weeks from first infection`,
+          text: `${labels.pLine[0]} ${week} ${labels.pLine[1]}`,
           fillStyle: `rgba(${140 + week * 15}, ${100 + week * 20}, ${160 +
             week * 10}, 0.6)`,
           strokeStyle: `rgb(${140 + week * 15}, ${100 + week * 20}, ${160 +
@@ -88,7 +116,7 @@
           week * 10})`,
         borderDash: [10, 5],
         pointRadius: 0,
-        xAxisID: 'time-axis',
+        xAxisID: 'time-axis-0',
         yAxisID: 'log-axis',
         cutoffWeek: week,
       })
@@ -101,10 +129,11 @@
       const predictionBarDataset = week => ({
         data: [{ t: moment(), y: 0 }],
         type: 'bar',
-        order: week,
+        order: 10 + week,
         backgroundColor: `rgba(${140 + week * 15}, ${100 + week * 20}, ${160 +
           week * 10}, 0.6)`,
-        xAxisID: 'time-axis',
+        barPercentage: 0.65 + 0.05 * week,
+        xAxisID: `time-axis-${week}`,
         yAxisID: 'linear-axis',
         cutoffWeek: week,
       })
@@ -114,6 +143,22 @@
         predictionBarDataset(5),
         predictionBarDataset(6),
       ]
+      const createTimeAxis = (axis, display, min, max) => ({
+        id: `time-axis-${axis}`,
+        type: 'time',
+        time: {
+          tick: 'day',
+          ticks: {
+            min: min,
+            max: max,
+          },
+        },
+        display: display,
+        stacked: true,
+        gridLines: {
+          offsetGridLines: true,
+        },
+      })
 
       const cChart = new Chart('cChart', {
         type: 'bar',
@@ -135,11 +180,11 @@
         },
         options: {
           title: {
-            text: 'Spread of COVID-19 in Finland',
+            text: labels.chart,
             display: true,
           },
           legend: {
-            position: 'right',
+            position: 'bottom',
             labels: {
               generateLabels: ({ config }) =>
                 config.data.datasets
@@ -149,27 +194,21 @@
           },
           scales: {
             xAxes: [
-              {
-                id: 'time-axis',
-                type: 'time',
-                time: {
-                  tick: 'day',
-                },
-                ticks: {
-                  min: moment(),
-                  max: moment().add(1, 'months'),
-                },
-              },
+              createTimeAxis(0, true, moment(), moment().add(1, 'months')),
+              createTimeAxis(3, false, moment(), moment().add(1, 'months')),
+              createTimeAxis(4, false, moment(), moment().add(1, 'months')),
+              createTimeAxis(5, false, moment(), moment().add(1, 'months')),
+              createTimeAxis(6, false, moment(), moment().add(1, 'months')),
             ],
             yAxes: [
               {
                 id: 'log-axis',
                 scaleLabel: {
-                  labelString: 'Total number of infected [line]',
+                  labelString: labels.line,
                   display: true,
                 },
                 type: 'logarithmic',
-                position: 'left',
+                position: 'right',
                 ticks: {
                   autoSkip: false,
                   callback: tick => {
@@ -183,12 +222,13 @@
               },
               {
                 id: 'linear-axis',
+                stacked: true,
                 scaleLabel: {
-                  labelString: 'New infections per day [bars]',
+                  labelString: labels.bars,
                   display: true,
                 },
                 type: 'linear',
-                position: 'right',
+                position: 'left',
                 ticks: {
                   callback: tick => {
                     if (tick % 50 === 0) return tick.toString()
@@ -198,7 +238,9 @@
                   min: 0,
                   max: 600 + Math.log10(6) * 100,
                   stepSize: 100,
+                  beginAtZero: true,
                 },
+                stacked: false,
               },
             ],
           },
@@ -289,26 +331,23 @@
           predictionLineDatasets.forEach(
             dataset => (dataset.data = predictLine(dataset.cutoffWeek))
           )
-          predictionBarDatasets.forEach(
-            (dataset, i) =>
-              (dataset.data = makeBars(predictionLineDatasets[i].data).splice(
-                1
-              ))
-          )
+          predictionBarDatasets.forEach((dataset, i) => {
+            dataset.data = makeBars(predictionLineDatasets[i].data)
+            dataset.data[0] = tBars[dataset.cutoffWeek * 7]
+          })
 
-          cChart.options.scales.xAxes[0] = {
-            id: 'time-axis',
-            type: 'time',
-            time: {
-              tick: 'day',
-            },
-            ticks: {
-              min: moment(iLine[0].t),
-              max: moment()
-                .add(2, 'months')
-                .add(-1, 'days'),
-            },
-          }
+          let min = moment(iLine[0].t)
+          let max = moment()
+            .add(2, 'months')
+            .add(-1, 'days')
+
+          cChart.options.scales.xAxes = [
+            createTimeAxis(0, true, min, max),
+            createTimeAxis(3, false, min, max),
+            createTimeAxis(4, false, min, max),
+            createTimeAxis(5, false, min, max),
+            createTimeAxis(6, false, min, max),
+          ]
           cChart.update()
         }
       )
