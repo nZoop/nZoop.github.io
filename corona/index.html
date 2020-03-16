@@ -42,7 +42,7 @@
           ],
         },
       }[navigator.language.slice(0, 2)]
-
+      const population = 5540000
       const infectionLineDataset = {
         data: [{ t: moment(), y: 0 }],
         legend: {
@@ -229,13 +229,13 @@
                 position: 'left',
                 ticks: {
                   callback: tick => {
-                    if (tick % 50 === 0) return tick.toString()
+                    if (tick % 200 === 0) return tick.toString()
                     return ''
                   },
 
                   min: 0,
-                  max: 600 + Math.log10(6) * 100,
-                  stepSize: 100,
+                  max: 1200 + Math.log10(6) * 200,
+                  stepSize: 200,
                   beginAtZero: true,
                 },
                 stacked: false,
@@ -287,6 +287,9 @@
             (tData.reduce((sum, data) => sum + data.y, 0) -
               tSlope * tData.reduce((sum, data) => sum + data.x, 0)) /
             tData.length
+          let tCutoff = Math.floor(
+            (Math.log10(population / 2) - tOffset) / tSlope
+          )
           let tLine = Array.from(
             {
               length: moment()
@@ -295,7 +298,12 @@
             },
             (n, i) => ({
               t: moment(iLine[0].t).add(i, 'days'),
-              y: Math.floor(Math.pow(10, i * tSlope + tOffset)),
+              y: Math.floor(
+                i <= tCutoff
+                  ? Math.pow(10, i * tSlope + tOffset)
+                  : 2 * Math.pow(10, tCutoff * tSlope + tOffset) -
+                      Math.pow(10, (2 * tCutoff - i) * tSlope + tOffset)
+              ),
             })
           )
           let tBars = makeBars(tLine)
@@ -310,29 +318,30 @@
               .filter(i =>
                 i.t.isSameOrAfter(moment(iLine[0].t).add(week, 'weeks'))
               )
-              .map((value, i) => ({
+              .map(value => ({
                 t: moment(value.t),
                 y: Math.floor(
-                  Math.pow(
-                    10,
-                    (7 * week +
-                      Math.log(
+                  Math.pow(10, 7 * week * tSlope + tOffset) +
+                    Math.pow(10, (7 * week + 1) * tSlope + tOffset) -
+                    Math.pow(
+                      10,
+                      (7 * week +
+                        1 -
                         value.t.diff(
                           moment(iLine[0].t).add(week, 'weeks'),
                           'days'
-                        ) + 1
-                      )) *
-                      tSlope +
-                      tOffset
-                  )
+                        )) *
+                        tSlope +
+                        tOffset
+                    )
                 ),
               }))
           predictionLineDatasets.forEach(
-            dataset => (dataset.data = predictLine(dataset.cutoffWeek))
+            dataset => (dataset.data = predictLine(dataset.cutoffWeek).slice(1))
           )
           predictionBarDatasets.forEach((dataset, i) => {
             dataset.data = makeBars(predictionLineDatasets[i].data)
-            dataset.data[0] = tBars[dataset.cutoffWeek * 7]
+            dataset.data[0].y = tBars[dataset.cutoffWeek * 7 + 1]
           })
 
           let min = moment(iLine[0].t)
