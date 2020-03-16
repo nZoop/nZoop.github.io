@@ -21,8 +21,6 @@
       <canvas id="cChart"></canvas>
     </div>
     <script>
-      console.log(navigator.language)
-      console.log(navigator.languages)
       const labels = {
         en: {
           chart: 'Spread of COVID-19 in Finland',
@@ -257,6 +255,7 @@
             }))
           let iLine = Array.from(
             data.confirmed
+              .sort((a, b) => new Date(a.date) - new Date(b.date))
               .slice(1)
               .reduce(
                 (cMap, confirmed, i) =>
