@@ -28,7 +28,7 @@
           line: 'Total number of infected [line]',
           iLine: 'confirmed infections',
           tLine: 'projected infections',
-          pLine: ['epidemic contained within', 'weeks from first infection'],
+          pLine: ['% of population gets infected', '% spread rate'],
         },
         fi: {
           chart: 'Koronaviruksen levinneisyys suomessa',
@@ -36,13 +36,11 @@
           line: 'Tartunnansaaneiden kokonaismäärä [viiva]',
           iLine: 'varmistetut tartunnat',
           tLine: 'ennustetut tartunnat',
-          pLine: [
-            'epidemia taittuu',
-            'viikon sisällä ensimmäisistä tartunnoista',
-          ],
+          pLine: ['% väestöstä sairastuu', '% leviämisnopeus'],
         },
       }[navigator.language.slice(0, 2)]
       const population = 5540000
+      const predictMonths = 6
       const infectionLineDataset = {
         data: [{ t: moment(), y: 0 }],
         legend: {
@@ -57,7 +55,7 @@
         borderColor: 'rgb(230, 90, 20)',
         pointRadius: 0,
         xAxisID: 'time-axis-0',
-        yAxisID: 'log-axis',
+        yAxisID: 'total-axis',
       }
       const infectionBarDataset = {
         data: [{ t: moment(), y: 0 }],
@@ -66,7 +64,7 @@
         backgroundColor: 'rgba(230, 90, 20, 0.5)',
         barPercentage: 0.4,
         xAxisID: 'time-axis-0',
-        yAxisID: 'linear-axis',
+        yAxisID: 'new-axis',
       }
       const trendlineDataset = {
         data: [{ t: moment(), y: 0 }],
@@ -84,7 +82,7 @@
         borderDash: [10, 5],
         pointRadius: 0,
         xAxisID: 'time-axis-0',
-        yAxisID: 'log-axis',
+        yAxisID: 'total-axis',
       }
       const trendbarDataset = {
         data: [{ t: moment(), y: 0 }],
@@ -93,53 +91,55 @@
         backgroundColor: 'rgba(240, 180, 40, 0.4)',
         barPercentage: 0.6,
         xAxisID: 'time-axis-0',
-        yAxisID: 'linear-axis',
+        yAxisID: 'new-axis',
       }
 
-      const predictionLineDataset = week => ({
+      const predictionLineDataset = (num, percentage, rate) => ({
         data: [{ t: moment(), y: 0 }],
         legend: {
-          text: `${labels.pLine[0]} ${week} ${labels.pLine[1]}`,
-          fillStyle: `rgba(${140 + week * 15}, ${100 + week * 20}, ${160 +
-            week * 10}, 0.6)`,
-          strokeStyle: `rgb(${140 + week * 15}, ${100 + week * 20}, ${160 +
-            week * 10})`,
+          text: `${percentage}${labels.pLine[0]}, ${rate}${labels.pLine[1]}`,
+          fillStyle: `rgba(${160 + num * 20}, ${125 + num * 25}, ${180 +
+            num * 10}, 0.6)`,
+          strokeStyle: `rgb(${160 + num * 20}, ${125 + num * 25}, ${180 +
+            num * 10})`,
           lineDash: [8, 4],
           lineJoin: 'round',
         },
         type: 'line',
-        order: week,
+        order: 5 + num,
         fill: false,
-        borderColor: `rgb(${140 + week * 15}, ${100 + week * 20}, ${160 +
-          week * 10})`,
+        borderColor: `rgb(${160 + num * 20}, ${125 + num * 25}, ${180 +
+          num * 10})`,
         borderDash: [10, 5],
         pointRadius: 0,
         xAxisID: 'time-axis-0',
-        yAxisID: 'log-axis',
-        cutoffWeek: week,
+        yAxisID: 'total-axis',
+        datasetNumber: num,
+        infectionPercentage: percentage,
+        infectionRate: rate,
       })
       const predictionLineDatasets = [
-        predictionLineDataset(3),
-        predictionLineDataset(4),
-        predictionLineDataset(5),
-        predictionLineDataset(6),
+        predictionLineDataset(1, 80, 60),
+        predictionLineDataset(2, 60, 40),
+        predictionLineDataset(3, 40, 20),
       ]
-      const predictionBarDataset = week => ({
+      const predictionBarDataset = (num, percentage, rate) => ({
         data: [{ t: moment(), y: 0 }],
         type: 'bar',
-        order: 10 + week,
-        backgroundColor: `rgba(${140 + week * 15}, ${100 + week * 20}, ${160 +
-          week * 10}, 0.6)`,
-        barPercentage: 0.65 + 0.05 * week,
-        xAxisID: `time-axis-${week}`,
-        yAxisID: 'linear-axis',
-        cutoffWeek: week,
+        order: 15 + num,
+        backgroundColor: `rgba(${160 + num * 20}, ${125 + num * 25}, ${180 +
+          num * 10}, 0.6)`,
+        barPercentage: 0.65 + 0.05 * num,
+        xAxisID: `time-axis-${num}`,
+        yAxisID: 'new-axis',
+        datasetNumber: num,
+        infectionPercentage: percentage,
+        infectionRate: rate,
       })
       const predictionBarDatasets = [
-        predictionBarDataset(3),
-        predictionBarDataset(4),
-        predictionBarDataset(5),
-        predictionBarDataset(6),
+        predictionBarDataset(1, 80, 60),
+        predictionBarDataset(2, 60, 40),
+        predictionBarDataset(3, 40, 20),
       ]
       const createTimeAxis = (axis, display, min, max) => ({
         id: `time-axis-${axis}`,
@@ -169,11 +169,9 @@
             predictionLineDatasets[0],
             predictionLineDatasets[1],
             predictionLineDatasets[2],
-            predictionLineDatasets[3],
             predictionBarDatasets[0],
             predictionBarDatasets[1],
             predictionBarDatasets[2],
-            predictionBarDatasets[3],
           ],
         },
         options: {
@@ -193,20 +191,19 @@
           scales: {
             xAxes: [
               createTimeAxis(0, true, moment(), moment().add(1, 'months')),
+              createTimeAxis(1, false, moment(), moment().add(1, 'months')),
+              createTimeAxis(2, false, moment(), moment().add(1, 'months')),
               createTimeAxis(3, false, moment(), moment().add(1, 'months')),
-              createTimeAxis(4, false, moment(), moment().add(1, 'months')),
-              createTimeAxis(5, false, moment(), moment().add(1, 'months')),
-              createTimeAxis(6, false, moment(), moment().add(1, 'months')),
             ],
             yAxes: [
               {
-                id: 'log-axis',
+                id: 'total-axis',
                 scaleLabel: {
-                  labelString: labels.line,
+                  labelString: [labels.line, labels.bars],
                   display: true,
                 },
                 type: 'logarithmic',
-                position: 'right',
+                position: 'left',
                 ticks: {
                   autoSkip: false,
                   callback: tick => {
@@ -219,24 +216,23 @@
                 },
               },
               {
-                id: 'linear-axis',
+                id: 'new-axis',
+                display: false,
                 stacked: true,
                 scaleLabel: {
                   labelString: labels.bars,
                   display: true,
                 },
-                type: 'linear',
+                type: 'logarithmic',
                 position: 'left',
                 ticks: {
                   callback: tick => {
-                    if (tick % 200 === 0) return tick.toString()
+                    if (tick / Math.pow(10, Math.floor(Math.log10(tick))) === 1)
+                      return tick.toString()
                     return ''
                   },
-
-                  min: 0,
-                  max: 1200 + Math.log10(6) * 200,
-                  stepSize: 200,
-                  beginAtZero: true,
+                  min: 1,
+                  max: 6000000,
                 },
                 stacked: false,
               },
@@ -293,7 +289,7 @@
           let tLine = Array.from(
             {
               length: moment()
-                .add(2, 'months')
+                .add(predictMonths, 'months')
                 .diff(iLine[0].t, 'days'),
             },
             (n, i) => ({
@@ -313,48 +309,76 @@
           trendlineDataset.data = tLine
           trendbarDataset.data = tBars
 
-          const predictLine = week =>
-            tLine
-              .filter(i =>
-                i.t.isSameOrAfter(moment(iLine[0].t).add(week, 'weeks'))
-              )
-              .map(value => ({
-                t: moment(value.t),
+          const predictLine = ({ infectionPercentage, infectionRate }) => {
+            let iNow = moment().diff(tLine[0].t, 'days') - 1
+            let pSlope = (tSlope * infectionRate) / 100
+            let pStart = Math.floor(
+              (Math.log10(tLine[iNow].y) - tOffset) / pSlope
+            )
+
+            let pOffset =
+              tLine[iNow].y - Math.pow(10, (pStart - 1) * pSlope + tOffset)
+
+            let pCutoff = Math.floor(
+              (Math.log10((population * infectionPercentage) / 200) - tOffset) /
+                pSlope
+            )
+
+            pLine = Array.from(
+              {
+                length: moment()
+                  .add(predictMonths, 'months')
+                  .diff(moment(), 'days'),
+              },
+              (n, i) => ({
+                t: moment().add(i - 1, 'days'),
                 y: Math.floor(
-                  Math.pow(10, 7 * week * tSlope + tOffset) +
-                    Math.pow(10, (7 * week + 1) * tSlope + tOffset) -
-                    Math.pow(
-                      10,
-                      (7 * week +
-                        1 -
-                        value.t.diff(
-                          moment(iLine[0].t).add(week, 'weeks'),
-                          'days'
-                        )) *
-                        tSlope +
-                        tOffset
-                    )
+                  i + pStart <= pCutoff
+                    ? Math.pow(10, (i + pStart) * pSlope + tOffset)
+                    : 2 * Math.pow(10, pCutoff * pSlope + tOffset) -
+                        Math.pow(
+                          10,
+                          (2 * pCutoff - (i + pStart)) * pSlope + tOffset
+                        ) +
+                        pOffset
                 ),
-              }))
+              })
+            )
+            console.log(
+              tSlope,
+              0,
+              tOffset,
+              tCutoff,
+              tLine[iNow].t._d,
+              tLine[iNow].y
+            )
+            console.log(
+              pSlope,
+              pStart,
+              pOffset,
+              pCutoff,
+              pLine[0].t._d,
+              pLine[0].y
+            )
+            return pLine
+          }
           predictionLineDatasets.forEach(
-            dataset => (dataset.data = predictLine(dataset.cutoffWeek).slice(1))
+            dataset => (dataset.data = predictLine(dataset))
           )
           predictionBarDatasets.forEach((dataset, i) => {
-            dataset.data = makeBars(predictionLineDatasets[i].data)
-            dataset.data[0].y = tBars[dataset.cutoffWeek * 7 + 1]
+            dataset.data = makeBars(predictionLineDatasets[i].data).splice(1)
           })
 
           let min = moment(iLine[0].t)
           let max = moment()
-            .add(2, 'months')
+            .add(predictMonths, 'months')
             .add(-1, 'days')
 
           cChart.options.scales.xAxes = [
             createTimeAxis(0, true, min, max),
+            createTimeAxis(1, false, min, max),
+            createTimeAxis(2, false, min, max),
             createTimeAxis(3, false, min, max),
-            createTimeAxis(4, false, min, max),
-            createTimeAxis(5, false, min, max),
-            createTimeAxis(6, false, min, max),
           ]
           cChart.update()
         }
