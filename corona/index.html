@@ -18,7 +18,10 @@
   </head>
   <body>
     <div width="95%">
-      <canvas id="cChart"></canvas>
+      <canvas id="cChart1"></canvas>
+    </div>
+    <div width="95%">
+      <canvas id="cChart2"></canvas>
     </div>
     <script>
       const labels = {
@@ -62,7 +65,8 @@
         type: 'bar',
         order: 10,
         backgroundColor: 'rgba(230, 90, 20, 0.5)',
-        barPercentage: 0.4,
+        barPercentage: 0.3,
+        gridLines: { offsetGridLines: false },
         xAxisID: 'time-axis-0',
         yAxisID: 'new-axis',
       }
@@ -89,7 +93,8 @@
         type: 'bar',
         order: 11,
         backgroundColor: 'rgba(240, 180, 40, 0.4)',
-        barPercentage: 0.6,
+        barPercentage: 0.5,
+        gridLines: { offsetGridLines: false },
         xAxisID: 'time-axis-0',
         yAxisID: 'new-axis',
       }
@@ -129,9 +134,10 @@
         order: 15 + num,
         backgroundColor: `rgba(${160 + num * 20}, ${125 + num * 25}, ${180 +
           num * 10}, 0.6)`,
-        barPercentage: 0.65 + 0.05 * num,
+        barPercentage: 0.55 + 0.15 * num,
         xAxisID: `time-axis-${num}`,
         yAxisID: 'new-axis',
+        gridLines: { offsetGridLines: false },
         datasetNumber: num,
         infectionPercentage: percentage,
         infectionRate: rate,
@@ -146,10 +152,10 @@
         type: 'time',
         time: {
           tick: 'day',
-          ticks: {
-            min: min,
-            max: max,
-          },
+        },
+        ticks: {
+          min: min,
+          max: max,
         },
         display: display,
         stacked: true,
@@ -158,7 +164,7 @@
         },
       })
 
-      const cChart = new Chart('cChart', {
+      const cChart1 = new Chart('cChart1', {
         type: 'bar',
         data: {
           datasets: [
@@ -199,11 +205,11 @@
               {
                 id: 'total-axis',
                 scaleLabel: {
-                  labelString: [labels.line, labels.bars],
+                  labelString: labels.line,
                   display: true,
                 },
                 type: 'logarithmic',
-                position: 'left',
+                position: 'right',
                 ticks: {
                   autoSkip: false,
                   callback: tick => {
@@ -217,15 +223,80 @@
               },
               {
                 id: 'new-axis',
-                display: false,
+                display: true,
                 stacked: true,
                 scaleLabel: {
                   labelString: labels.bars,
                   display: true,
                 },
-                type: 'logarithmic',
+                type: 'linear',
                 position: 'left',
                 ticks: {
+                  callback: tick => {
+                    if (tick % 250 === 0) return tick.toString()
+                    return ''
+                  },
+                  min: 0,
+                  max: 1500 + Math.log10(6) * 250,
+                  stepSize: 250,
+                  beginAtZero: true,
+                },
+                stacked: false,
+              },
+            ],
+          },
+        },
+      })
+
+      const cChart2 = new Chart('cChart2', {
+        type: 'bar',
+        data: {
+          datasets: [
+            infectionLineDataset,
+            infectionBarDataset,
+            trendlineDataset,
+            trendbarDataset,
+            predictionLineDatasets[0],
+            predictionLineDatasets[1],
+            predictionLineDatasets[2],
+            predictionBarDatasets[0],
+            predictionBarDatasets[1],
+            predictionBarDatasets[2],
+          ],
+        },
+        options: {
+          title: {
+            text: labels.chart,
+            display: false,
+          },
+          legend: {
+            position: 'bottom',
+            display: false,
+            labels: {
+              generateLabels: ({ config }) =>
+                config.data.datasets
+                  .filter(dataset => 'legend' in dataset)
+                  .map(dataset => dataset.legend),
+            },
+          },
+          scales: {
+            xAxes: [
+              createTimeAxis(0, true, moment(), moment().add(1, 'months')),
+              createTimeAxis(1, false, moment(), moment().add(1, 'months')),
+              createTimeAxis(2, false, moment(), moment().add(1, 'months')),
+              createTimeAxis(3, false, moment(), moment().add(1, 'months')),
+            ],
+            yAxes: [
+              {
+                id: 'total-axis',
+                scaleLabel: {
+                  labelString: labels.line,
+                  display: true,
+                },
+                type: 'logarithmic',
+                position: 'right',
+                ticks: {
+                  autoSkip: false,
                   callback: tick => {
                     if (tick / Math.pow(10, Math.floor(Math.log10(tick))) === 1)
                       return tick.toString()
@@ -233,6 +304,27 @@
                   },
                   min: 1,
                   max: 6000000,
+                },
+              },
+              {
+                id: 'new-axis',
+                display: true,
+                stacked: true,
+                scaleLabel: {
+                  labelString: labels.bars,
+                  display: true,
+                },
+                type: 'linear',
+                position: 'left',
+                ticks: {
+                  callback: tick => {
+                    if (tick % 50000 === 0) return tick.toString()
+                    return ''
+                  },
+                  min: 0,
+                  max: 300000 + Math.log10(6) * 50000,
+                  stepSize: 50000,
+                  beginAtZero: true,
                 },
                 stacked: false,
               },
@@ -331,7 +423,9 @@
                   .diff(moment(), 'days'),
               },
               (n, i) => ({
-                t: moment().add(i - 1, 'days'),
+                t: moment()
+                  .startOf('day')
+                  .add(i - 1, 'days'),
                 y: Math.floor(
                   i + pStart <= pCutoff
                     ? Math.pow(10, (i + pStart) * pSlope + tOffset)
@@ -344,22 +438,6 @@
                 ),
               })
             )
-            console.log(
-              tSlope,
-              0,
-              tOffset,
-              tCutoff,
-              tLine[iNow].t._d,
-              tLine[iNow].y
-            )
-            console.log(
-              pSlope,
-              pStart,
-              pOffset,
-              pCutoff,
-              pLine[0].t._d,
-              pLine[0].y
-            )
             return pLine
           }
           predictionLineDatasets.forEach(
@@ -370,17 +448,30 @@
           })
 
           let min = moment(iLine[0].t)
-          let max = moment()
+          let max1 = moment()
+            .add(1, 'months')
+            .add(-1, 'days')
+          let max2 = moment()
             .add(predictMonths, 'months')
             .add(-1, 'days')
 
-          cChart.options.scales.xAxes = [
-            createTimeAxis(0, true, min, max),
-            createTimeAxis(1, false, min, max),
-            createTimeAxis(2, false, min, max),
-            createTimeAxis(3, false, min, max),
+          cChart1.options.scales.xAxes = [
+            createTimeAxis(0, true, min, max1),
+            createTimeAxis(1, false, min, max1),
+            createTimeAxis(2, false, min, max1),
+            createTimeAxis(3, false, min, max1),
           ]
-          cChart.update()
+          cChart1.update()
+
+          cChart2.options.scales.xAxes = [
+            createTimeAxis(0, true, min, max2),
+            createTimeAxis(1, false, min, max2),
+            createTimeAxis(2, false, min, max2),
+            createTimeAxis(3, false, min, max2),
+          ]
+          cChart2.update()
+
+          console.log(iBars, tBars, predictionBarDatasets)
         }
       )
     </script>
