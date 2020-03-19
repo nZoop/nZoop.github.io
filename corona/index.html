@@ -27,19 +27,21 @@
       const labels = {
         en: {
           chart: 'Spread of COVID-19 in Finland',
-          bars: 'New infections per day [bars]',
+          bars: 'New population per day [bars]',
           line: 'Total number of infected [line]',
           iLine: 'confirmed infections',
-          tLine: 'projected infections',
-          pLine: ['% of population gets infected', '% spread rate'],
+          trend: 'projected infections',
+          population: '% of population gets infected',
+          growth: 'growth rate',
         },
         fi: {
           chart: 'Koronaviruksen levinneisyys suomessa',
           bars: 'Päivittäiset tartunnat [pylväät]',
           line: 'Tartunnansaaneiden kokonaismäärä [viiva]',
           iLine: 'varmistetut tartunnat',
-          tLine: 'ennustetut tartunnat',
-          pLine: ['% väestöstä sairastuu', '% leviämisnopeus'],
+          trend: 'ennustetut tartunnat',
+          population: '% väestöstä sairastuu',
+          growth: 'kasvunopeus',
         },
       }[navigator.language.slice(0, 2)]
       const population = 5540000
@@ -73,7 +75,7 @@
       const trendlineDataset = {
         data: [{ t: moment(), y: 0 }],
         legend: {
-          text: labels.tLine,
+          text: labels.trend,
           fillStyle: 'rgba(240, 180, 40, 0.4)',
           strokeStyle: 'rgb(240, 180, 40)',
           lineDash: [8, 4],
@@ -102,7 +104,7 @@
       const predictionLineDataset = (num, percentage, rate) => ({
         data: [{ t: moment(), y: 0 }],
         legend: {
-          text: `${percentage}${labels.pLine[0]}, ${rate}${labels.pLine[1]}`,
+          text: `${percentage}${labels.population}, ${labels.growth} ${rate}%`,
           fillStyle: `rgba(${160 + num * 20}, ${125 + num * 25}, ${180 +
             num * 10}, 0.6)`,
           strokeStyle: `rgb(${160 + num * 20}, ${125 + num * 25}, ${180 +
@@ -124,9 +126,9 @@
         infectionRate: rate,
       })
       const predictionLineDatasets = [
-        predictionLineDataset(1, 80, 60),
-        predictionLineDataset(2, 60, 40),
-        predictionLineDataset(3, 40, 20),
+        predictionLineDataset(1, 65, 8),
+        predictionLineDataset(2, 50, 5),
+        predictionLineDataset(3, 40, 3),
       ]
       const predictionBarDataset = (num, percentage, rate) => ({
         data: [{ t: moment(), y: 0 }],
@@ -143,9 +145,9 @@
         infectionRate: rate,
       })
       const predictionBarDatasets = [
-        predictionBarDataset(1, 80, 60),
-        predictionBarDataset(2, 60, 40),
-        predictionBarDataset(3, 40, 20),
+        predictionBarDataset(1, 65, 8),
+        predictionBarDataset(2, 50, 5),
+        predictionBarDataset(3, 40, 3),
       ]
       const createTimeAxis = (axis, display, min, max) => ({
         id: `time-axis-${axis}`,
@@ -401,15 +403,20 @@
           trendlineDataset.data = tLine
           trendbarDataset.data = tBars
 
+          trendlineDataset.legend.text = `${labels.trend}, ${
+            labels.growth
+          } ${Math.round(tSlope * 100)}%`
+
           const predictLine = ({ infectionPercentage, infectionRate }) => {
-            let iNow = moment().diff(tLine[0].t, 'days') - 1
-            let pSlope = (tSlope * infectionRate) / 100
+            let iNow = moment().diff(tLine[0].t, 'days')
+            let pSlope = infectionRate / 100
             let pStart = Math.floor(
-              (Math.log10(tLine[iNow].y) - tOffset) / pSlope
+              (Math.log10(iLine[iLine.length - 1].y) - tOffset) / pSlope
             )
 
             let pOffset =
-              tLine[iNow].y - Math.pow(10, (pStart - 1) * pSlope + tOffset)
+              iLine[iLine.length - 1].y -
+              Math.pow(10, (pStart - 1) * pSlope + tOffset)
 
             let pCutoff = Math.floor(
               (Math.log10((population * infectionPercentage) / 200) - tOffset) /
@@ -425,10 +432,10 @@
               (n, i) => ({
                 t: moment()
                   .startOf('day')
-                  .add(i - 1, 'days'),
+                  .add(i, 'days'),
                 y: Math.floor(
                   i + pStart <= pCutoff
-                    ? Math.pow(10, (i + pStart) * pSlope + tOffset)
+                    ? Math.pow(10, (i + pStart) * pSlope + tOffset) + pOffset
                     : 2 * Math.pow(10, pCutoff * pSlope + tOffset) -
                         Math.pow(
                           10,
@@ -470,8 +477,6 @@
             createTimeAxis(3, false, min, max2),
           ]
           cChart2.update()
-
-          console.log(iBars, tBars, predictionBarDatasets)
         }
       )
     </script>
