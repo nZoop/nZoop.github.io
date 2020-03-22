@@ -27,7 +27,7 @@
       const labels = {
         en: {
           chart: 'Spread of COVID-19 in Finland',
-          bars: 'New population per day [bars]',
+          bars: 'New infections per day [bars]',
           line: 'Total number of infected [line]',
           iLine: 'confirmed infections',
           trend: 'projected infections',
@@ -416,7 +416,7 @@
 
             let pOffset =
               iLine[iLine.length - 1].y -
-              Math.pow(10, (pStart - 1) * pSlope + tOffset)
+              Math.pow(10, pStart * pSlope + tOffset)
 
             let pCutoff = Math.floor(
               (Math.log10((population * infectionPercentage) / 200) - tOffset) /
