@@ -126,8 +126,8 @@
         infectionRate: rate,
       })
       const predictionLineDatasets = [
-        predictionLineDataset(1, 65, 8),
-        predictionLineDataset(2, 50, 5),
+        predictionLineDataset(1, 60, 18),
+        predictionLineDataset(2, 50, 5.8),
         predictionLineDataset(3, 40, 3),
       ]
       const predictionBarDataset = (num, percentage, rate) => ({
@@ -145,8 +145,8 @@
         infectionRate: rate,
       })
       const predictionBarDatasets = [
-        predictionBarDataset(1, 65, 8),
-        predictionBarDataset(2, 50, 5),
+        predictionBarDataset(1, 60, 18),
+        predictionBarDataset(2, 50, 5.8),
         predictionBarDataset(3, 40, 3),
       ]
       const createTimeAxis = (axis, display, min, max) => ({
@@ -335,6 +335,32 @@
         },
       })
 
+      const trendLine = rawData => {
+        let data = rawData.map(value => ({
+          x: value.t.diff(rawData[0].t, 'days'),
+          y: Math.log10(value.y),
+        }))
+        let slope =
+          (data.length *
+            data.reduce((sum, value) => sum + value.x * value.y, 0) -
+            data.reduce((sum, value) => sum + value.x, 0) *
+              data.reduce((sum, value) => sum + value.y, 0)) /
+          (data.length *
+            data.reduce((sum, value) => sum + value.x * value.x, 0) -
+            Math.pow(
+              data.reduce((sum, value) => sum + value.x, 0),
+              2
+            ))
+        let offset =
+          (data.reduce((sum, value) => sum + value.y, 0) -
+            slope * data.reduce((sum, value) => sum + value.x, 0)) /
+          data.length
+        return {
+          slope: slope,
+          offset: offset,
+        }
+      }
+
       $.get(
         'https://w3qa5ydb4l.execute-api.eu-west-1.amazonaws.com/prod/finnishCoronaData',
         data => {
@@ -362,23 +388,9 @@
             x: value.t.diff(iLine[0].t, 'days'),
             y: Math.log10(value.y),
           }))
-          let tSlope =
-            (tData.length *
-              tData.reduce((sum, data) => sum + data.x * data.y, 0) -
-              tData.reduce((sum, data) => sum + data.x, 0) *
-                tData.reduce((sum, data) => sum + data.y, 0)) /
-            (tData.length *
-              tData.reduce((sum, data) => sum + data.x * data.x, 0) -
-              Math.pow(
-                tData.reduce((sum, data) => sum + data.x, 0),
-                2
-              ))
-          let tOffset =
-            (tData.reduce((sum, data) => sum + data.y, 0) -
-              tSlope * tData.reduce((sum, data) => sum + data.x, 0)) /
-            tData.length
+          tParams = trendLine(iLine)
           let tCutoff = Math.floor(
-            (Math.log10(population / 2) - tOffset) / tSlope
+            (Math.log10(population / 2) - tParams.offset) / tParams.slope
           )
           let tLine = Array.from(
             {
@@ -390,9 +402,12 @@
               t: moment(iLine[0].t).add(i, 'days'),
               y: Math.floor(
                 i <= tCutoff
-                  ? Math.pow(10, i * tSlope + tOffset)
-                  : 2 * Math.pow(10, tCutoff * tSlope + tOffset) -
-                      Math.pow(10, (2 * tCutoff - i) * tSlope + tOffset)
+                  ? Math.pow(10, i * tParams.slope + tParams.offset)
+                  : 2 * Math.pow(10, tCutoff * tParams.slope + tParams.offset) -
+                      Math.pow(
+                        10,
+                        (2 * tCutoff - i) * tParams.slope + tParams.offset
+                      )
               ),
             })
           )
@@ -405,21 +420,22 @@
 
           trendlineDataset.legend.text = `${labels.trend}, ${
             labels.growth
-          } ${Math.round(tSlope * 100)}%`
+          } ${Math.round(tParams.slope * 100)}%`
 
           const predictLine = ({ infectionPercentage, infectionRate }) => {
             let iNow = moment().diff(tLine[0].t, 'days')
             let pSlope = infectionRate / 100
             let pStart = Math.floor(
-              (Math.log10(iLine[iLine.length - 1].y) - tOffset) / pSlope
+              (Math.log10(iLine[iLine.length - 1].y) - tParams.offset) / pSlope
             )
 
             let pOffset =
               iLine[iLine.length - 1].y -
-              Math.pow(10, pStart * pSlope + tOffset)
+              Math.pow(10, pStart * pSlope + tParams.offset)
 
             let pCutoff = Math.floor(
-              (Math.log10((population * infectionPercentage) / 200) - tOffset) /
+              (Math.log10((population * infectionPercentage) / 200) -
+                tParams.offset) /
                 pSlope
             )
 
@@ -430,16 +446,17 @@
                   .diff(moment(), 'days'),
               },
               (n, i) => ({
-                t: moment()
+                t: moment(iLine[iLine.length - 1].t)
                   .startOf('day')
                   .add(i, 'days'),
                 y: Math.floor(
                   i + pStart <= pCutoff
-                    ? Math.pow(10, (i + pStart) * pSlope + tOffset) + pOffset
-                    : 2 * Math.pow(10, pCutoff * pSlope + tOffset) -
+                    ? Math.pow(10, (i + pStart) * pSlope + tParams.offset) +
+                        pOffset
+                    : 2 * Math.pow(10, pCutoff * pSlope + tParams.offset) -
                         Math.pow(
                           10,
-                          (2 * pCutoff - (i + pStart)) * pSlope + tOffset
+                          (2 * pCutoff - (i + pStart)) * pSlope + tParams.offset
                         ) +
                         pOffset
                 ),
