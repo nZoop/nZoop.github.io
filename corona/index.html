@@ -30,8 +30,9 @@
           bars: 'New infections per day [bars]',
           line: 'Total number of infected [line]',
           iLine: 'confirmed infections',
-          trend: 'projected infections',
+          trend: 'linear projection',
           population: '% of population gets infected',
+          rates: ['original', 'current', 'reduced'],
           growth: 'growth rate',
         },
         fi: {
@@ -39,8 +40,9 @@
           bars: 'Päivittäiset tartunnat [pylväät]',
           line: 'Tartunnansaaneiden kokonaismäärä [viiva]',
           iLine: 'varmistetut tartunnat',
-          trend: 'ennustetut tartunnat',
+          trend: 'lineaarinen malli',
           population: '% väestöstä sairastuu',
+          rates: ['alkuperäinen', 'tämänhetkinen', 'rajoitettu'],
           growth: 'kasvunopeus',
         },
       }[navigator.language.slice(0, 2)]
@@ -101,10 +103,10 @@
         yAxisID: 'new-axis',
       }
 
-      const predictionLineDataset = (num, percentage, rate) => ({
+      const predictionLineDataset = (num, percentage, rate, label) => ({
         data: [{ t: moment(), y: 0 }],
         legend: {
-          text: `${percentage}${labels.population}, ${labels.growth} ${rate}%`,
+          text: `${label} ${labels.growth} ${rate}%`,
           fillStyle: `rgba(${160 + num * 20}, ${125 + num * 25}, ${180 +
             num * 10}, 0.6)`,
           strokeStyle: `rgb(${160 + num * 20}, ${125 + num * 25}, ${180 +
@@ -126,11 +128,11 @@
         infectionRate: rate,
       })
       const predictionLineDatasets = [
-        predictionLineDataset(1, 60, 18),
-        predictionLineDataset(2, 50, 5.8),
-        predictionLineDataset(3, 40, 3),
+        predictionLineDataset(1, 50, 18, labels.rates[0]),
+        predictionLineDataset(2, 50, 5.8, labels.rates[1]),
+        predictionLineDataset(3, 50, 3, labels.rates[2]),
       ]
-      const predictionBarDataset = (num, percentage, rate) => ({
+      const predictionBarDataset = num => ({
         data: [{ t: moment(), y: 0 }],
         type: 'bar',
         order: 15 + num,
@@ -141,13 +143,11 @@
         yAxisID: 'new-axis',
         gridLines: { offsetGridLines: false },
         datasetNumber: num,
-        infectionPercentage: percentage,
-        infectionRate: rate,
       })
       const predictionBarDatasets = [
-        predictionBarDataset(1, 60, 18),
-        predictionBarDataset(2, 50, 5.8),
-        predictionBarDataset(3, 40, 3),
+        predictionBarDataset(1),
+        predictionBarDataset(2),
+        predictionBarDataset(3),
       ]
       const createTimeAxis = (axis, display, min, max) => ({
         id: `time-axis-${axis}`,
@@ -335,40 +335,44 @@
         },
       })
 
-      const trendLine = rawData => {
-        let data = rawData.map(value => ({
-          x: value.t.diff(rawData[0].t, 'days'),
-          y: Math.log10(value.y),
-        }))
-        let slope =
-          (data.length *
-            data.reduce((sum, value) => sum + value.x * value.y, 0) -
-            data.reduce((sum, value) => sum + value.x, 0) *
-              data.reduce((sum, value) => sum + value.y, 0)) /
-          (data.length *
-            data.reduce((sum, value) => sum + value.x * value.x, 0) -
-            Math.pow(
-              data.reduce((sum, value) => sum + value.x, 0),
-              2
-            ))
-        let offset =
-          (data.reduce((sum, value) => sum + value.y, 0) -
-            slope * data.reduce((sum, value) => sum + value.x, 0)) /
-          data.length
-        return {
-          slope: slope,
-          offset: offset,
-        }
-      }
-
       $.get(
         'https://w3qa5ydb4l.execute-api.eu-west-1.amazonaws.com/prod/finnishCoronaData',
         data => {
+          // calculate trend line parameters
+          const trendLine = rawData => {
+            let data = rawData.map(value => ({
+              x: value.t.diff(rawData[0].t, 'days'),
+              y: Math.log10(value.y),
+            }))
+            let slope =
+              (data.length *
+                data.reduce((sum, value) => sum + value.x * value.y, 0) -
+                data.reduce((sum, value) => sum + value.x, 0) *
+                  data.reduce((sum, value) => sum + value.y, 0)) /
+              (data.length *
+                data.reduce((sum, value) => sum + value.x * value.x, 0) -
+                Math.pow(
+                  data.reduce((sum, value) => sum + value.x, 0),
+                  2
+                ))
+            let offset =
+              (data.reduce((sum, value) => sum + value.y, 0) -
+                slope * data.reduce((sum, value) => sum + value.x, 0)) /
+              data.length
+            return {
+              slope: slope,
+              offset: offset,
+            }
+          }
+
+          // create growth bars
           const makeBars = line =>
             line.map((value, i) => ({
               t: moment(value.t),
               y: i === 0 ? value.y : value.y - line[i - 1].y,
             }))
+
+          // confirmed infection datasets
           let iLine = Array.from(
             data.confirmed
               .sort((a, b) => new Date(a.date) - new Date(b.date))
@@ -384,6 +388,8 @@
             ([date, confirmed]) => ({ t: moment(date), y: confirmed })
           ).sort((a, b) => a.t - b.t)
           let iBars = makeBars(iLine)
+
+          // trendline datasets
           let tData = iLine.map(value => ({
             x: value.t.diff(iLine[0].t, 'days'),
             y: Math.log10(value.y),
@@ -417,28 +423,25 @@
           infectionBarDataset.data = iBars
           trendlineDataset.data = tLine
           trendbarDataset.data = tBars
-
           trendlineDataset.legend.text = `${labels.trend}, ${
             labels.growth
           } ${Math.round(tParams.slope * 100)}%`
 
+          // calculate prediction line
           const predictLine = ({ infectionPercentage, infectionRate }) => {
             let iNow = moment().diff(tLine[0].t, 'days')
             let pSlope = infectionRate / 100
             let pStart = Math.floor(
               (Math.log10(iLine[iLine.length - 1].y) - tParams.offset) / pSlope
             )
-
             let pOffset =
               iLine[iLine.length - 1].y -
               Math.pow(10, pStart * pSlope + tParams.offset)
-
-            let pCutoff = Math.floor(
+            let pCutoff = Math.ceil(
               (Math.log10((population * infectionPercentage) / 200) -
                 tParams.offset) /
                 pSlope
             )
-
             pLine = Array.from(
               {
                 length: moment()
@@ -464,13 +467,26 @@
             )
             return pLine
           }
-          predictionLineDatasets.forEach(
-            dataset => (dataset.data = predictLine(dataset))
-          )
+
+          let infectionRates = [
+            trendLine(iLine.slice(0, 13)).slope * 100,
+            trendLine(iLine.slice(13)).slope * 100,
+            (trendLine(iLine.slice(13)).slope * 100) / 2,
+          ]
+
+          // prediction line datasets
+          predictionLineDatasets.forEach((dataset, i) => {
+            dataset.infectionRate = infectionRates[i]
+            dataset.legend.text = `${labels.rates[i]} ${
+              labels.growth
+            } ${Math.round(infectionRates[i] * 10) / 10}%`
+            dataset.data = predictLine(dataset)
+          })
           predictionBarDatasets.forEach((dataset, i) => {
             dataset.data = makeBars(predictionLineDatasets[i].data).splice(1)
           })
 
+          // update charts
           let min = moment(iLine[0].t)
           let max1 = moment()
             .add(1, 'months')
