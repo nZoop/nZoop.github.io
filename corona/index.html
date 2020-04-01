@@ -470,8 +470,8 @@
 
           let infectionRates = [
             trendLine(iLine.slice(0, 13)).slope,
-            trendLine(iLine.slice(13)).slope,
-            trendLine(iLine.slice(13)).slope / 2,
+            trendLine(iLine.slice(iLine.length - 14)).slope,
+            trendLine(iLine.slice(iLine.length - 14)).slope / 2,
           ]
 
           // prediction line datasets
