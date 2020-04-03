@@ -47,7 +47,7 @@
         },
       }[navigator.language.slice(0, 2)]
       const population = 5540000
-      const predictMonths = 6
+      const predictMonths = 8
       const infectionLineDataset = {
         data: [{ t: moment(), y: 0 }],
         legend: {
@@ -336,7 +336,7 @@
       })
 
       $.get(
-        'https://w3qa5ydb4l.execute-api.eu-west-1.amazonaws.com/prod/finnishCoronaData',
+        'https://w3qa5ydb4l.execute-api.eu-west-1.amazonaws.com/prod/finnishCoronaData/v2',
         data => {
           // calculate trend line parameters
           const trendLine = rawData => {
