@@ -335,183 +335,189 @@
         },
       })
 
-      $.get(
-        'https://w3qa5ydb4l.execute-api.eu-west-1.amazonaws.com/prod/finnishCoronaData/v2',
-        data => {
-          // calculate trend line parameters
-          const trendLine = rawData => {
-            let data = rawData.map(value => ({
-              x: value.t.diff(rawData[0].t, 'days'),
-              y: Math.log10(value.y),
-            }))
-            let slope =
-              (data.length *
-                data.reduce((sum, value) => sum + value.x * value.y, 0) -
-                data.reduce((sum, value) => sum + value.x, 0) *
-                  data.reduce((sum, value) => sum + value.y, 0)) /
-              (data.length *
-                data.reduce((sum, value) => sum + value.x * value.x, 0) -
-                Math.pow(
-                  data.reduce((sum, value) => sum + value.x, 0),
-                  2
-                ))
-            let offset =
-              (data.reduce((sum, value) => sum + value.y, 0) -
-                slope * data.reduce((sum, value) => sum + value.x, 0)) /
-              data.length
-            return {
-              slope: slope,
-              offset: offset,
-            }
-          }
-
-          // create growth bars
-          const makeBars = line =>
-            line.map((value, i) => ({
-              t: moment(value.t),
-              y: i === 0 ? value.y : value.y - line[i - 1].y,
-            }))
-
-          // confirmed infection datasets
-          let iLine = Array.from(
-            data.confirmed
-              .sort((a, b) => new Date(a.date) - new Date(b.date))
-              .slice(1)
-              .reduce(
-                (cMap, confirmed, i) =>
-                  cMap.set(
-                    new Date(confirmed.date).setHours(0, 0, 0, 0),
-                    i + 1
-                  ),
-                new Map()
-              ),
-            ([date, confirmed]) => ({ t: moment(date), y: confirmed })
-          ).sort((a, b) => a.t - b.t)
-          let iBars = makeBars(iLine)
-
-          // trendline datasets
-          let tData = iLine.map(value => ({
-            x: value.t.diff(iLine[0].t, 'days'),
+      const processData = data => {
+        // calculate trend line parameters
+        const trendLine = rawData => {
+          let data = rawData.map(value => ({
+            x: value.t.diff(rawData[0].t, 'days'),
             y: Math.log10(value.y),
           }))
-          tParams = trendLine(iLine)
-          let tCutoff = Math.floor(
-            (Math.log10(population / 2) - tParams.offset) / tParams.slope
+          let slope =
+            (data.length *
+              data.reduce((sum, value) => sum + value.x * value.y, 0) -
+              data.reduce((sum, value) => sum + value.x, 0) *
+                data.reduce((sum, value) => sum + value.y, 0)) /
+            (data.length *
+              data.reduce((sum, value) => sum + value.x * value.x, 0) -
+              Math.pow(
+                data.reduce((sum, value) => sum + value.x, 0),
+                2
+              ))
+          let offset =
+            (data.reduce((sum, value) => sum + value.y, 0) -
+              slope * data.reduce((sum, value) => sum + value.x, 0)) /
+            data.length
+          return {
+            slope: slope,
+            offset: offset,
+          }
+        }
+
+        // create growth bars
+        const makeBars = line =>
+          line.map((value, i) => ({
+            t: moment(value.t),
+            y: i === 0 ? value.y : value.y - line[i - 1].y,
+          }))
+
+        // confirmed infection datasets
+        let iLine = Array.from(
+          data.confirmed
+            .sort((a, b) => new Date(a.date) - new Date(b.date))
+            .slice(1)
+            .reduce(
+              (cMap, confirmed, i) =>
+                cMap.set(new Date(confirmed.date).setHours(0, 0, 0, 0), i + 1),
+              new Map()
+            ),
+          ([date, confirmed]) => ({ t: moment(date), y: confirmed })
+        ).sort((a, b) => a.t - b.t)
+        let iBars = makeBars(iLine)
+
+        // trendline datasets
+        let tData = iLine.map(value => ({
+          x: value.t.diff(iLine[0].t, 'days'),
+          y: Math.log10(value.y),
+        }))
+        tParams = trendLine(iLine)
+        let tCutoff = Math.floor(
+          (Math.log10(population / 2) - tParams.offset) / tParams.slope
+        )
+        let tLine = Array.from(
+          {
+            length: moment()
+              .add(predictMonths, 'months')
+              .diff(iLine[0].t, 'days'),
+          },
+          (n, i) => ({
+            t: moment(iLine[0].t).add(i, 'days'),
+            y: Math.floor(
+              i <= tCutoff
+                ? Math.pow(10, i * tParams.slope + tParams.offset)
+                : 2 * Math.pow(10, tCutoff * tParams.slope + tParams.offset) -
+                    Math.pow(
+                      10,
+                      (2 * tCutoff - i) * tParams.slope + tParams.offset
+                    )
+            ),
+          })
+        )
+        let tBars = makeBars(tLine)
+
+        infectionLineDataset.data = iLine
+        infectionBarDataset.data = iBars
+        trendlineDataset.data = tLine
+        trendbarDataset.data = tBars
+        trendlineDataset.legend.text = `${labels.trend}, ${
+          labels.growth
+        } ${Math.round(1000 * (Math.exp(tParams.slope) - 1)) / 10}%`
+
+        // calculate prediction line
+        const predictLine = ({ infectionPercentage, infectionRate }) => {
+          let iNow = moment().diff(tLine[0].t, 'days')
+          let pSlope = infectionRate / 100
+          let pStart = Math.floor(
+            (Math.log10(iLine[iLine.length - 1].y) - tParams.offset) / pSlope
           )
-          let tLine = Array.from(
+          let pOffset =
+            iLine[iLine.length - 1].y -
+            Math.pow(10, pStart * pSlope + tParams.offset)
+          let pCutoff = Math.ceil(
+            (Math.log10((population * infectionPercentage) / 200) -
+              tParams.offset) /
+              pSlope
+          )
+          pLine = Array.from(
             {
               length: moment()
                 .add(predictMonths, 'months')
-                .diff(iLine[0].t, 'days'),
+                .diff(moment(), 'days'),
             },
             (n, i) => ({
-              t: moment(iLine[0].t).add(i, 'days'),
+              t: moment(iLine[iLine.length - 1].t)
+                .startOf('day')
+                .add(i, 'days'),
               y: Math.floor(
-                i <= tCutoff
-                  ? Math.pow(10, i * tParams.slope + tParams.offset)
-                  : 2 * Math.pow(10, tCutoff * tParams.slope + tParams.offset) -
+                i + pStart <= pCutoff
+                  ? Math.pow(10, (i + pStart) * pSlope + tParams.offset) +
+                      pOffset
+                  : 2 * Math.pow(10, pCutoff * pSlope + tParams.offset) -
                       Math.pow(
                         10,
-                        (2 * tCutoff - i) * tParams.slope + tParams.offset
-                      )
+                        (2 * pCutoff - (i + pStart)) * pSlope + tParams.offset
+                      ) +
+                      pOffset
               ),
             })
           )
-          let tBars = makeBars(tLine)
-
-          infectionLineDataset.data = iLine
-          infectionBarDataset.data = iBars
-          trendlineDataset.data = tLine
-          trendbarDataset.data = tBars
-          trendlineDataset.legend.text = `${labels.trend}, ${
-            labels.growth
-          } ${Math.round(1000 * (Math.exp(tParams.slope) - 1)) / 10}%`
-
-          // calculate prediction line
-          const predictLine = ({ infectionPercentage, infectionRate }) => {
-            let iNow = moment().diff(tLine[0].t, 'days')
-            let pSlope = infectionRate / 100
-            let pStart = Math.floor(
-              (Math.log10(iLine[iLine.length - 1].y) - tParams.offset) / pSlope
-            )
-            let pOffset =
-              iLine[iLine.length - 1].y -
-              Math.pow(10, pStart * pSlope + tParams.offset)
-            let pCutoff = Math.ceil(
-              (Math.log10((population * infectionPercentage) / 200) -
-                tParams.offset) /
-                pSlope
-            )
-            pLine = Array.from(
-              {
-                length: moment()
-                  .add(predictMonths, 'months')
-                  .diff(moment(), 'days'),
-              },
-              (n, i) => ({
-                t: moment(iLine[iLine.length - 1].t)
-                  .startOf('day')
-                  .add(i, 'days'),
-                y: Math.floor(
-                  i + pStart <= pCutoff
-                    ? Math.pow(10, (i + pStart) * pSlope + tParams.offset) +
-                        pOffset
-                    : 2 * Math.pow(10, pCutoff * pSlope + tParams.offset) -
-                        Math.pow(
-                          10,
-                          (2 * pCutoff - (i + pStart)) * pSlope + tParams.offset
-                        ) +
-                        pOffset
-                ),
-              })
-            )
-            return pLine
-          }
-
-          let infectionRates = [
-            trendLine(iLine.slice(0, 13)).slope,
-            trendLine(iLine.slice(iLine.length - 14)).slope,
-            trendLine(iLine.slice(iLine.length - 14)).slope / 2,
-          ]
-
-          // prediction line datasets
-          predictionLineDatasets.forEach((dataset, i) => {
-            dataset.infectionRate = infectionRates[i] * 100
-            dataset.legend.text = `${labels.rates[i]} ${
-              labels.growth
-            } ${Math.round(1000 * (Math.exp(infectionRates[i]) - 1)) / 10}%`
-            dataset.data = predictLine(dataset)
-          })
-          predictionBarDatasets.forEach((dataset, i) => {
-            dataset.data = makeBars(predictionLineDatasets[i].data).splice(1)
-          })
-
-          // update charts
-          let min = moment(iLine[0].t)
-          let max1 = moment()
-            .add(1, 'months')
-            .add(-1, 'days')
-          let max2 = moment()
-            .add(predictMonths, 'months')
-            .add(-1, 'days')
-
-          cChart1.options.scales.xAxes = [
-            createTimeAxis(0, true, min, max1),
-            createTimeAxis(1, false, min, max1),
-            createTimeAxis(2, false, min, max1),
-            createTimeAxis(3, false, min, max1),
-          ]
-          cChart1.update()
-
-          cChart2.options.scales.xAxes = [
-            createTimeAxis(0, true, min, max2),
-            createTimeAxis(1, false, min, max2),
-            createTimeAxis(2, false, min, max2),
-            createTimeAxis(3, false, min, max2),
-          ]
-          cChart2.update()
+          return pLine
         }
+
+        let infectionRates = [
+          trendLine(iLine.slice(0, 13)).slope,
+          trendLine(iLine.slice(iLine.length - 14)).slope,
+          trendLine(iLine.slice(iLine.length - 14)).slope / 2,
+        ]
+
+        // prediction line datasets
+        predictionLineDatasets.forEach((dataset, i) => {
+          dataset.infectionRate = infectionRates[i] * 100
+          dataset.legend.text = `${labels.rates[i]} ${
+            labels.growth
+          } ${Math.round(1000 * (Math.exp(infectionRates[i]) - 1)) / 10}%`
+          dataset.data = predictLine(dataset)
+        })
+        predictionBarDatasets.forEach((dataset, i) => {
+          dataset.data = makeBars(predictionLineDatasets[i].data).splice(1)
+        })
+
+        // update charts
+        let min = moment(iLine[0].t)
+        let max1 = moment()
+          .add(1, 'months')
+          .add(-1, 'days')
+        let max2 = moment()
+          .add(predictMonths, 'months')
+          .add(-1, 'days')
+
+        cChart1.options.scales.xAxes = [
+          createTimeAxis(0, true, min, max1),
+          createTimeAxis(1, false, min, max1),
+          createTimeAxis(2, false, min, max1),
+          createTimeAxis(3, false, min, max1),
+        ]
+        cChart1.update()
+
+        cChart2.options.scales.xAxes = [
+          createTimeAxis(0, true, min, max2),
+          createTimeAxis(1, false, min, max2),
+          createTimeAxis(2, false, min, max2),
+          createTimeAxis(3, false, min, max2),
+        ]
+        cChart2.update()
+      }
+
+      $.get(
+        'https://w3qa5ydb4l.execute-api.eu-west-1.amazonaws.com/prod/finnishCoronaData/v2'
       )
+        .done(data => {
+          localStorage.setItem('data', JSON.stringify(data))
+          processData(data)
+        })
+        .fail(() => {
+          let data = JSON.parse(localStorage.getItem('data'))
+          processData(data)
+        })
     </script>
   </body>
 </html>
