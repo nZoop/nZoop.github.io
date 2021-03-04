@@ -32,7 +32,7 @@
           iLine: 'confirmed infections',
           trend: 'linear projection',
           population: '% of population gets infected',
-          rates: ['original', 'current', 'reduced'],
+          rates: ['current', 'expected', 'projected'],
           growth: 'growth rate',
         },
         fi: {
@@ -42,7 +42,7 @@
           iLine: 'varmistetut tartunnat',
           trend: 'lineaarinen malli',
           population: '% väestöstä sairastuu',
-          rates: ['alkuperäinen', 'tämänhetkinen', 'rajoitettu'],
+          rates: ['tämänhetkinen', 'oletettu', 'lineaarisen mallin'],
           growth: 'kasvunopeus',
         },
       }[navigator.language.slice(0, 2)]
@@ -107,18 +107,21 @@
         data: [{ t: moment(), y: 0 }],
         legend: {
           text: `${label} ${labels.growth} ${rate}%`,
-          fillStyle: `rgba(${160 + num * 20}, ${125 + num * 25}, ${180 +
-            num * 10}, 0.6)`,
-          strokeStyle: `rgb(${160 + num * 20}, ${125 + num * 25}, ${180 +
-            num * 10})`,
+          fillStyle: `rgba(${160 + num * 20}, ${125 + num * 25}, ${
+            180 + num * 10
+          }, 0.6)`,
+          strokeStyle: `rgb(${160 + num * 20}, ${125 + num * 25}, ${
+            180 + num * 10
+          })`,
           lineDash: [8, 4],
           lineJoin: 'round',
         },
         type: 'line',
         order: 5 + num,
         fill: false,
-        borderColor: `rgb(${160 + num * 20}, ${125 + num * 25}, ${180 +
-          num * 10})`,
+        borderColor: `rgb(${160 + num * 20}, ${125 + num * 25}, ${
+          180 + num * 10
+        })`,
         borderDash: [10, 5],
         pointRadius: 0,
         xAxisID: 'time-axis-0',
@@ -128,16 +131,17 @@
         infectionRate: rate,
       })
       const predictionLineDatasets = [
-        predictionLineDataset(1, 50, 18, labels.rates[0]),
-        predictionLineDataset(2, 50, 5.8, labels.rates[1]),
-        predictionLineDataset(3, 50, 3, labels.rates[2]),
+        predictionLineDataset(1, 50, 6, labels.rates[0]),
+        predictionLineDataset(2, 50, 6, labels.rates[1]),
+        predictionLineDataset(3, 50, 6, labels.rates[2]),
       ]
-      const predictionBarDataset = num => ({
+      const predictionBarDataset = (num) => ({
         data: [{ t: moment(), y: 0 }],
         type: 'bar',
         order: 15 + num,
-        backgroundColor: `rgba(${160 + num * 20}, ${125 + num * 25}, ${180 +
-          num * 10}, 0.6)`,
+        backgroundColor: `rgba(${160 + num * 20}, ${125 + num * 25}, ${
+          180 + num * 10
+        }, 0.6)`,
         barPercentage: 0.55 + 0.15 * num,
         xAxisID: `time-axis-${num}`,
         yAxisID: 'new-axis',
@@ -192,8 +196,8 @@
             labels: {
               generateLabels: ({ config }) =>
                 config.data.datasets
-                  .filter(dataset => 'legend' in dataset)
-                  .map(dataset => dataset.legend),
+                  .filter((dataset) => 'legend' in dataset)
+                  .map((dataset) => dataset.legend),
             },
           },
           scales: {
@@ -214,7 +218,7 @@
                 position: 'right',
                 ticks: {
                   autoSkip: false,
-                  callback: tick => {
+                  callback: (tick) => {
                     if (tick / Math.pow(10, Math.floor(Math.log10(tick))) === 1)
                       return tick.toString()
                     return ''
@@ -234,7 +238,7 @@
                 type: 'linear',
                 position: 'left',
                 ticks: {
-                  callback: tick => {
+                  callback: (tick) => {
                     if (tick % 250 === 0) return tick.toString()
                     return ''
                   },
@@ -277,8 +281,8 @@
             labels: {
               generateLabels: ({ config }) =>
                 config.data.datasets
-                  .filter(dataset => 'legend' in dataset)
-                  .map(dataset => dataset.legend),
+                  .filter((dataset) => 'legend' in dataset)
+                  .map((dataset) => dataset.legend),
             },
           },
           scales: {
@@ -299,7 +303,7 @@
                 position: 'right',
                 ticks: {
                   autoSkip: false,
-                  callback: tick => {
+                  callback: (tick) => {
                     if (tick / Math.pow(10, Math.floor(Math.log10(tick))) === 1)
                       return tick.toString()
                     return ''
@@ -319,7 +323,7 @@
                 type: 'linear',
                 position: 'left',
                 ticks: {
-                  callback: tick => {
+                  callback: (tick) => {
                     if (tick % 50000 === 0) return tick.toString()
                     return ''
                   },
@@ -335,10 +339,10 @@
         },
       })
 
-      const processData = data => {
+      const processData = (data) => {
         // calculate trend line parameters
-        const trendLine = rawData => {
-          let data = rawData.map(value => ({
+        const trendLine = (rawData) => {
+          let data = rawData.map((value) => ({
             x: value.t.diff(rawData[0].t, 'days'),
             y: Math.log10(value.y),
           }))
@@ -364,7 +368,7 @@
         }
 
         // create growth bars
-        const makeBars = line =>
+        const makeBars = (line) =>
           line.map((value, i) => ({
             t: moment(value.t),
             y: i === 0 ? value.y : value.y - line[i - 1].y,
@@ -385,7 +389,7 @@
         let iBars = makeBars(iLine)
 
         // trendline datasets
-        let tData = iLine.map(value => ({
+        let tData = iLine.map((value) => ({
           x: value.t.diff(iLine[0].t, 'days'),
           y: Math.log10(value.y),
         }))
@@ -418,9 +422,9 @@
         infectionBarDataset.data = iBars
         trendlineDataset.data = tLine
         trendbarDataset.data = tBars
-        trendlineDataset.legend.text = `${labels.trend}, ${
-          labels.growth
-        } ${Math.round(1000 * (Math.exp(tParams.slope) - 1)) / 10}%`
+        trendlineDataset.legend.text = `${labels.trend}, ${labels.growth} ${
+          Math.round(1000 * (Math.exp(tParams.slope) - 1)) / 10
+        }%`
 
         // calculate prediction line
         const predictLine = ({ infectionPercentage, infectionRate }) => {
@@ -464,17 +468,17 @@
         }
 
         let infectionRates = [
-          trendLine(iLine.slice(0, 13)).slope,
           trendLine(iLine.slice(iLine.length - 14)).slope,
-          trendLine(iLine.slice(iLine.length - 14)).slope / 2,
+          trendLine(iLine.slice(iLine.length - 14)).slope * 1.7,
+          tParams.slope,
         ]
 
         // prediction line datasets
         predictionLineDatasets.forEach((dataset, i) => {
           dataset.infectionRate = infectionRates[i] * 100
-          dataset.legend.text = `${labels.rates[i]} ${
-            labels.growth
-          } ${Math.round(1000 * (Math.exp(infectionRates[i]) - 1)) / 10}%`
+          dataset.legend.text = `${labels.rates[i]} ${labels.growth} ${
+            Math.round(1000 * (Math.exp(infectionRates[i]) - 1)) / 10
+          }%`
           dataset.data = predictLine(dataset)
         })
         predictionBarDatasets.forEach((dataset, i) => {
@@ -483,12 +487,8 @@
 
         // update charts
         let min = moment(iLine[0].t)
-        let max1 = moment()
-          .add(1, 'months')
-          .add(-1, 'days')
-        let max2 = moment()
-          .add(predictMonths, 'months')
-          .add(-1, 'days')
+        let max1 = moment().add(1, 'months').add(-1, 'days')
+        let max2 = moment().add(predictMonths, 'months').add(-1, 'days')
 
         cChart1.options.scales.xAxes = [
           createTimeAxis(0, true, min, max1),
@@ -510,7 +510,8 @@
       $.get(
         'https://w3qa5ydb4l.execute-api.eu-west-1.amazonaws.com/prod/finnishCoronaData/v2'
       )
-        .done(data => {
+        .done((data) => {
+          data = {...data, confirmed: data.confirmed.slice(-45000)}
           localStorage.setItem('data', JSON.stringify(data))
           processData(data)
         })
